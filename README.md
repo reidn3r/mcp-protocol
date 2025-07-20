@@ -1,135 +1,65 @@
-# Turborepo starter
+# Sistema LLM com Model Context Protocol
 
-This Turborepo starter is maintained by the Turborepo core team.
+Sistema de processamento de linguagem natural que integra LLM (GEMINI 2.5 FLASH) com recursos externos via Model Context Protocol (MCP) para criação de Tarefas.
 
-## Using this example
+## Arquitetura
 
-Run the following command:
+```mermaid
+sequenceDiagram
+    participant HOST as HOST<br/>(API Client/UX Interface)
+    participant API as API Gateway<br/>(NestJS RESTful Service)
+    participant LLM as LLM Processing Engine<br/>(GEMINI 2.5 FLASH)<br/>(Natural Language Understanding)<br/>(Prompt Engineering Layer)
+    participant CLIENT as MCP Server<br/>(Model Context Protocol)<br/>(Resource Management)
+    participant SERVER as Resource Layer<br/>(Tools, Documents,<br/>External APIs)
 
-```sh
-npx create-turbo@latest
+    HOST->>+API: HTTP POST /api/query<br/>{user_query, session_context}
+    
+    API->>+CLIENT: JSON-RPC 2.0 Request<br/>Method: list_resources<br/>Params: {query_context}
+    CLIENT->>+SERVER: MCP Protocol Call<br/>discover_available_resources()
+    SERVER-->>-CLIENT: MCP Response<br/>{resources[], capabilities[], schemas[]}
+    CLIENT-->>-API: JSON-RPC 2.0 Response<br/>{available_tools, resource_metadata}
+    
+    API->>+LLM: Inference Request<br/>POST /v1/models/gemini-2.5-flash:generateContent<br/>{prompt, context, available_tools}
+    Note over LLM: Intent Classification<br/>Resource Selection<br/>Parameter Extraction<br/>Action Planning
+    LLM-->>-API: Generated Response<br/>{selected_tool, parameters, reasoning}
+    
+    API->>+CLIENT: JSON-RPC 2.0 Execute<br/>Method: invoke_tool<br/>Params: {tool_id, arguments}
+    CLIENT->>+SERVER: MCP Tool Invocation<br/>execute_operation(tool_id, params)
+    SERVER-->>-CLIENT: Operation Result<br/>{status, data, metadata}
+    CLIENT-->>-API: JSON-RPC 2.0 Response<br/>{execution_result, performance_metrics}
+    
+    API-->>-HOST: HTTP 200 OK<br/>{processed_response, execution_trace}
 ```
 
-## What's inside?
+## Componentes
 
-This Turborepo includes the following packages/apps:
+- **API REST**: Serviço HTTP em NestJS
+- **LLM Engine**: GEMINI 2.5 FLASH para processamento de linguagem natural
+- **MCP Server**: Gerenciamento de recursos via Model Context Protocol
+- **Resource Layer**: Tools, documentos e APIs externas
 
-### Apps and Packages
+## Stack Técnico
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- **Backend**: NestJS (TypeScript)
+- **LLM**: Google GEMINI 2.5 FLASH
+- **Protocol**: Model Context Protocol (MCP)
+- **Comunicação**: JSON-RPC 2.0, REST API
+- **Client**: API Client
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+## Acesso ao LLM (porta: 3000)
+```bash
+POST /mcp/tasks
+Content-Type: application/json
 
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+{
+  "query": "Sua consulta aqui",
+}
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+## Configuração
 
+Configure as variáveis de ambiente:
+
+```env
+GEMINI_API_KEY=your_api_key
 ```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
